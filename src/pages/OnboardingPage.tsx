@@ -1,7 +1,6 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
 import { useToast } from '@/hooks/use-toast';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -14,8 +13,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { FileCheck, FileUp, Loader2 } from 'lucide-react';
 import { UserProfile } from '@/types';
 
+// Mock user for now until Clerk is properly set up
+const mockUser = {
+  id: 'mock-user-id',
+  fullName: '',
+  primaryEmailAddress: {
+    emailAddress: ''
+  },
+};
+
 const OnboardingPage = () => {
-  const { user } = useUser();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -23,8 +30,8 @@ const OnboardingPage = () => {
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<Partial<UserProfile>>({
-    fullName: user?.fullName || '',
-    email: user?.primaryEmailAddress?.emailAddress || '',
+    fullName: '',
+    email: '',
     phoneNumber: '',
     dateOfBirth: '',
     emergencyContact: {
@@ -71,7 +78,6 @@ const OnboardingPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
     
     setIsLoading(true);
     
@@ -80,14 +86,14 @@ const OnboardingPage = () => {
       
       // Upload profile picture if provided
       if (profilePictureFile) {
-        const storageRef = ref(storage, `users/${user.id}/profile-picture`);
+        const storageRef = ref(storage, `users/${mockUser.id}/profile-picture`);
         const uploadResult = await uploadBytes(storageRef, profilePictureFile);
         profilePictureUrl = await getDownloadURL(uploadResult.ref);
       }
       
       // Create user profile document
       const userProfile: UserProfile = {
-        id: user.id,
+        id: mockUser.id,
         fullName: formData.fullName || '',
         email: formData.email || '',
         phoneNumber: formData.phoneNumber || '',
@@ -99,7 +105,7 @@ const OnboardingPage = () => {
       };
       
       // Save to Firestore
-      await setDoc(doc(db, 'users', user.id), userProfile);
+      await setDoc(doc(db, 'users', mockUser.id), userProfile);
       
       toast({
         title: 'Profile Created',
@@ -165,7 +171,6 @@ const OnboardingPage = () => {
                       value={formData.email}
                       onChange={handleInputChange}
                       required
-                      disabled
                     />
                   </div>
                   

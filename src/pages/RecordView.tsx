@@ -1,7 +1,5 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
 import { doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { MedicalRecord } from '@/types';
@@ -31,10 +29,12 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+// Mock user ID for now
+const MOCK_USER_ID = 'mock-user-id';
+
 const RecordView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useUser();
   const { toast } = useToast();
   const [record, setRecord] = useState<MedicalRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,14 +44,14 @@ const RecordView = () => {
 
   useEffect(() => {
     const fetchRecord = async () => {
-      if (!id || !user) return;
+      if (!id) return;
 
       try {
         setIsLoading(true);
         const docRef = doc(db, 'records', id);
         const docSnap = await getDoc(docRef);
 
-        if (docSnap.exists() && docSnap.data().userId === user.id) {
+        if (docSnap.exists() && docSnap.data().userId === MOCK_USER_ID) {
           const data = docSnap.data();
           setRecord({
             ...data,
@@ -82,10 +82,10 @@ const RecordView = () => {
     };
 
     fetchRecord();
-  }, [id, user, navigate, toast]);
+  }, [id, navigate, toast]);
 
   const handleDeleteRecord = async () => {
-    if (!id || !user) return;
+    if (!id) return;
     
     try {
       setIsDeleting(true);

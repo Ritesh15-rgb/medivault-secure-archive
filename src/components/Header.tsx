@@ -1,14 +1,13 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserButton, useUser } from '@clerk/clerk-react';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const Header = () => {
   const navigate = useNavigate();
-  const { user } = useUser();
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSearch = (e: React.FormEvent) => {
@@ -39,12 +38,14 @@ const Header = () => {
         </Button>
         
         <div className="flex items-center gap-3">
-          {user && (
-            <div className="hidden md:block text-right">
-              <p className="text-sm font-medium">{user.fullName || user.primaryEmailAddress?.emailAddress}</p>
-            </div>
-          )}
-          <UserButton afterSignOutUrl="/" />
+          <div className="hidden md:block text-right">
+            <p className="text-sm font-medium">User</p>
+          </div>
+          <Avatar>
+            <AvatarFallback>
+              <User className="h-4 w-4" />
+            </AvatarFallback>
+          </Avatar>
         </div>
       </div>
     </header>
