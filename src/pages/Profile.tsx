@@ -1,31 +1,28 @@
 
+// Fix the toDate() issue in Profile.tsx
 import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
-import { useToast } from '@/hooks/use-toast';
 import { UserProfile } from '@/types';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { FileUp, Loader2, UserCircle, Settings } from 'lucide-react';
-import { format } from 'date-fns';
+import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { FileUp, Save, Loader2, User as UserIcon } from 'lucide-react';
 
 const Profile = () => {
   const { user } = useUser();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
-  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
-  
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [formData, setFormData] = useState<Partial<UserProfile>>({
+  const [profileData, setProfileData] = useState<Partial<UserProfile>>({
     fullName: '',
+    email: '',
     phoneNumber: '',
     dateOfBirth: '',
     emergencyContact: {
@@ -34,75 +31,95 @@ const Profile = () => {
       phoneNumber: ''
     }
   });
+  
+  const [profilePicture, setProfilePicture] = useState<File | null>(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const fetchProfile = async () => {
       if (!user) return;
 
       try {
         setIsLoading(true);
-        const userDoc = await getDoc(doc(db, 'users', user.id));
-        
-        if (userDoc.exists()) {
-          const profileData = userDoc.data() as UserProfile;
-          setUserProfile(profileData);
-          setFormData({
-            fullName: profileData.fullName,
-            phoneNumber: profileData.phoneNumber,
-            dateOfBirth: profileData.dateOfBirth,
-            emergencyContact: profileData.emergencyContact
-          });
+        const docRef = doc(db, 'users', user.id);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data() as UserProfile;
           
-          if (profileData.profilePicture) {
-            setProfilePicturePreview(profileData.profilePicture);
+          // Format dates if they exist
+          if (data.createdAt) {
+            // Check if it's a Firestore Timestamp (has toDate method) or a regular Date
+            if ('toDate' in data.createdAt) {
+              data.createdAt = data.createdAt.toDate();
+            }
+          }
+          
+          if (data.updatedAt) {
+            // Check if it's a Firestore Timestamp (has toDate method) or a regular Date
+            if ('toDate' in data.updatedAt) {
+              data.updatedAt = data.updatedAt.toDate();
+            }
+          }
+          
+          setProfileData(data);
+          if (data.profilePicture) {
+            setProfilePicturePreview(data.profilePicture);
           }
         } else {
-          toast({
-            title: 'Profile Not Found',
-            description: 'Your profile information could not be loaded.',
-            variant: 'destructive'
+          // If profile doesn't exist, initialize with Clerk data
+          setProfileData({
+            fullName: user.fullName || '',
+            email: user.primaryEmailAddress?.emailAddress || '',
+            phoneNumber: '',
+            dateOfBirth: '',
+            emergencyContact: {
+              name: '',
+              relationship: '',
+              phoneNumber: ''
+            }
           });
         }
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        console.error('Error fetching profile:', error);
         toast({
           title: 'Error',
           description: 'Failed to load profile information.',
-          variant: 'destructive'
+          variant: 'destructive',
         });
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchUserProfile();
+    fetchProfile();
   }, [user, toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     
     // Handle nested emergency contact fields
-    if (name.startsWith('emergency')) {
+    if (name.startsWith('emergency.')) {
       const field = name.split('.')[1];
-      setFormData({
-        ...formData,
+      setProfileData({
+        ...profileData,
         emergencyContact: {
-          ...formData.emergencyContact as any,
+          ...profileData.emergencyContact as any,
           [field]: value
         }
       });
     } else {
-      setFormData({
-        ...formData,
+      setProfileData({
+        ...profileData,
         [name]: value
       });
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setProfilePictureFile(file);
+      setProfilePicture(file);
       
       // Create preview URL
       const reader = new FileReader();
@@ -113,69 +130,60 @@ const Profile = () => {
     }
   };
 
-  const handleEditMode = () => {
-    setEditMode(!editMode);
-    
-    if (!editMode) {
-      // Reset form data to current profile when entering edit mode
-      if (userProfile) {
-        setFormData({
-          fullName: userProfile.fullName,
-          phoneNumber: userProfile.phoneNumber,
-          dateOfBirth: userProfile.dateOfBirth,
-          emergencyContact: userProfile.emergencyContact
-        });
-      }
-    } else {
-      // Reset file input when exiting edit mode without saving
-      setProfilePictureFile(null);
-      setProfilePicturePreview(userProfile?.profilePicture || null);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!user || !userProfile) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
     
     setIsSaving(true);
     
     try {
-      let profilePictureUrl = userProfile.profilePicture || '';
+      let profilePictureUrl = profileData.profilePicture || '';
       
-      // Upload new profile picture if provided
-      if (profilePictureFile) {
+      // Upload new profile picture if one was selected
+      if (profilePicture) {
         const storageRef = ref(storage, `users/${user.id}/profile-picture`);
-        const uploadResult = await uploadBytes(storageRef, profilePictureFile);
+        const uploadResult = await uploadBytes(storageRef, profilePicture);
         profilePictureUrl = await getDownloadURL(uploadResult.ref);
       }
       
-      // Update user profile document
-      const updatedProfile = {
-        ...userProfile,
-        ...formData,
-        profilePicture: profilePictureUrl,
+      // Prepare profile data for saving
+      const updatedProfile: UserProfile = {
+        id: user.id,
+        fullName: profileData.fullName || '',
+        email: profileData.email || '',
+        phoneNumber: profileData.phoneNumber || '',
+        dateOfBirth: profileData.dateOfBirth || '',
+        emergencyContact: profileData.emergencyContact as UserProfile['emergencyContact'],
+        profilePicture: profilePictureUrl || undefined,
+        createdAt: profileData.createdAt || new Date(),
         updatedAt: new Date()
       };
       
-      await updateDoc(doc(db, 'users', user.id), updatedProfile);
-      
-      setUserProfile(updatedProfile);
+      // Save to Firestore
+      await setDoc(doc(db, 'users', user.id), updatedProfile);
       
       toast({
         title: 'Profile Updated',
-        description: 'Your profile has been successfully updated!'
+        description: 'Your profile information has been saved successfully.'
       });
-      
-      setEditMode(false);
     } catch (error) {
-      console.error('Error updating user profile:', error);
+      console.error('Error saving profile:', error);
       toast({
-        title: 'Update Failed',
-        description: 'There was a problem updating your profile. Please try again.',
+        title: 'Error',
+        description: 'There was a problem saving your profile. Please try again.',
         variant: 'destructive'
       });
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase();
   };
 
   if (isLoading) {
@@ -188,218 +196,165 @@ const Profile = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Your Profile</h1>
-          <p className="text-muted-foreground">
-            Manage your personal information and emergency contacts
-          </p>
-        </div>
-        
-        <Button
-          onClick={handleEditMode}
-          variant={editMode ? "outline" : "default"}
-        >
-          {editMode ? 'Cancel' : (
-            <>
-              <Settings className="mr-2 h-4 w-4" />
-              Edit Profile
-            </>
-          )}
-        </Button>
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Your Profile</h1>
+        <p className="text-muted-foreground">
+          Manage your personal information and preferences
+        </p>
       </div>
       
-      <div className="space-y-6">
-        {/* Profile Header */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Profile Picture Card */}
         <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              {/* Profile Picture */}
-              <div className="relative">
-                <Avatar className="w-24 h-24">
-                  <AvatarImage src={profilePicturePreview || undefined} alt={userProfile?.fullName} />
-                  <AvatarFallback className="text-2xl bg-medivault-100 text-medivault-500">
-                    {userProfile?.fullName?.charAt(0) || <UserCircle className="h-12 w-12" />}
-                  </AvatarFallback>
-                </Avatar>
-                
-                {editMode && (
-                  <Label
-                    htmlFor="profilePicture"
-                    className="absolute -bottom-2 -right-2 bg-primary text-primary-foreground h-8 w-8 rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
-                  >
-                    <FileUp className="h-4 w-4" />
-                    <Input
-                      id="profilePicture"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                  </Label>
-                )}
-              </div>
-              
-              {/* User Info */}
-              <div className="flex-1 text-center sm:text-left">
-                <h2 className="text-2xl font-bold">{userProfile?.fullName}</h2>
-                <p className="text-muted-foreground">{userProfile?.email}</p>
-                {userProfile?.createdAt && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Member since {format(userProfile.createdAt.toDate(), 'MMMM yyyy')}
-                  </p>
-                )}
-              </div>
-              
-              {editMode && (
-                <Button 
-                  onClick={handleSave}
-                  className="bg-medivault-500 hover:bg-medivault-600"
-                  disabled={isSaving}
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Changes'
-                  )}
-                </Button>
+          <CardHeader>
+            <CardTitle>Profile Picture</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center">
+            <Avatar className="w-32 h-32">
+              {profilePicturePreview ? (
+                <AvatarImage src={profilePicturePreview} alt={profileData.fullName} />
+              ) : (
+                <AvatarFallback className="text-4xl bg-medivault-100 text-medivault-500">
+                  {profileData.fullName ? getInitials(profileData.fullName) : <UserIcon />}
+                </AvatarFallback>
               )}
-            </div>
+            </Avatar>
+            
+            <Label 
+              htmlFor="profilePicture" 
+              className="mt-4 cursor-pointer inline-flex items-center gap-2 text-sm bg-gray-100 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors"
+            >
+              <FileUp className="h-4 w-4" />
+              Change Picture
+            </Label>
+            <Input
+              id="profilePicture"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleProfilePictureChange}
+            />
+            
+            <p className="text-xs text-muted-foreground mt-2">
+              Recommended: Square image, at least 300x300 pixels
+            </p>
           </CardContent>
         </Card>
         
-        {/* Personal Information */}
-        <Card>
+        {/* Profile Information Card */}
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Personal Information</CardTitle>
-            <CardDescription>
-              Your basic personal information
-            </CardDescription>
+            <CardDescription>Update your personal details</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="fullName">Full Name</Label>
-                {editMode ? (
+          <CardContent>
+            <form onSubmit={handleSubmit} id="profile-form" className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
                   <Input
                     id="fullName"
                     name="fullName"
-                    value={formData.fullName}
+                    value={profileData.fullName}
                     onChange={handleInputChange}
+                    required
                   />
-                ) : (
-                  <p className="mt-1 px-3 py-1.5 border rounded-md bg-gray-50">
-                    {userProfile?.fullName}
-                  </p>
-                )}
-              </div>
-              
-              <div>
-                <Label htmlFor="email">Email Address</Label>
-                <p className="mt-1 px-3 py-1.5 border rounded-md bg-gray-50">
-                  {userProfile?.email}
-                </p>
-              </div>
-              
-              <div>
-                <Label htmlFor="phoneNumber">Phone Number</Label>
-                {editMode ? (
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={profileData.email}
+                    onChange={handleInputChange}
+                    disabled
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="phoneNumber">Phone Number</Label>
                   <Input
                     id="phoneNumber"
                     name="phoneNumber"
-                    value={formData.phoneNumber}
+                    value={profileData.phoneNumber}
                     onChange={handleInputChange}
                   />
-                ) : (
-                  <p className="mt-1 px-3 py-1.5 border rounded-md bg-gray-50">
-                    {userProfile?.phoneNumber}
-                  </p>
-                )}
-              </div>
-              
-              <div>
-                <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                {editMode ? (
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="dateOfBirth">Date of Birth</Label>
                   <Input
                     id="dateOfBirth"
                     name="dateOfBirth"
                     type="date"
-                    value={formData.dateOfBirth}
+                    value={profileData.dateOfBirth}
                     onChange={handleInputChange}
                   />
-                ) : (
-                  <p className="mt-1 px-3 py-1.5 border rounded-md bg-gray-50">
-                    {userProfile?.dateOfBirth}
-                  </p>
-                )}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Emergency Contact */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Emergency Contact</CardTitle>
-            <CardDescription>
-              Person to contact in case of emergency
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="emergency.name">Name</Label>
-                {editMode ? (
-                  <Input
-                    id="emergency.name"
-                    name="emergency.name"
-                    value={formData.emergencyContact?.name}
-                    onChange={handleInputChange}
-                  />
-                ) : (
-                  <p className="mt-1 px-3 py-1.5 border rounded-md bg-gray-50">
-                    {userProfile?.emergencyContact?.name}
-                  </p>
-                )}
-              </div>
+
+              <Separator className="my-6" />
               
               <div>
-                <Label htmlFor="emergency.relationship">Relationship</Label>
-                {editMode ? (
-                  <Input
-                    id="emergency.relationship"
-                    name="emergency.relationship"
-                    value={formData.emergencyContact?.relationship}
-                    onChange={handleInputChange}
-                  />
-                ) : (
-                  <p className="mt-1 px-3 py-1.5 border rounded-md bg-gray-50">
-                    {userProfile?.emergencyContact?.relationship}
-                  </p>
-                )}
+                <h3 className="font-medium mb-4">Emergency Contact</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency.name">Contact Name</Label>
+                    <Input
+                      id="emergency.name"
+                      name="emergency.name"
+                      value={profileData.emergencyContact?.name}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency.relationship">Relationship</Label>
+                    <Input
+                      id="emergency.relationship"
+                      name="emergency.relationship"
+                      value={profileData.emergencyContact?.relationship}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency.phoneNumber">Phone Number</Label>
+                    <Input
+                      id="emergency.phoneNumber"
+                      name="emergency.phoneNumber"
+                      value={profileData.emergencyContact?.phoneNumber}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                </div>
               </div>
-              
-              <div>
-                <Label htmlFor="emergency.phoneNumber">Phone Number</Label>
-                {editMode ? (
-                  <Input
-                    id="emergency.phoneNumber"
-                    name="emergency.phoneNumber"
-                    value={formData.emergencyContact?.phoneNumber}
-                    onChange={handleInputChange}
-                  />
-                ) : (
-                  <p className="mt-1 px-3 py-1.5 border rounded-md bg-gray-50">
-                    {userProfile?.emergencyContact?.phoneNumber}
-                  </p>
-                )}
-              </div>
-            </div>
+            </form>
           </CardContent>
+          
+          <div className="border-t p-4 flex justify-end">
+            <Button
+              type="submit"
+              form="profile-form"
+              className="bg-medivault-500 hover:bg-medivault-600"
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
         </Card>
       </div>
     </div>

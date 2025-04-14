@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
@@ -6,7 +5,7 @@ import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { MedicalRecord, RecordCategory } from '@/types';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsItem, TabsList } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Calendar, 
   FileText, 
@@ -237,7 +236,7 @@ const Dashboard = () => {
       <Tabs defaultValue="all" value={activeCategory} onValueChange={setActiveCategory}>
         <TabsList className="overflow-x-auto">
           {categories.map(category => (
-            <TabsItem 
+            <TabsTrigger 
               key={category.id} 
               value={category.id}
               className="flex items-center gap-1.5"
@@ -247,7 +246,7 @@ const Dashboard = () => {
               <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded-full">
                 {categoryCounts[category.id] || 0}
               </span>
-            </TabsItem>
+            </TabsTrigger>
           ))}
         </TabsList>
 
