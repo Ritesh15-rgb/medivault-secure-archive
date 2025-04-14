@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { MedicalRecord, RecordCategory } from '@/types';
@@ -31,6 +30,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
 
+// Mock user ID for now
+const MOCK_USER_ID = 'mock-user-id';
+
 // Category icons mapping
 const categoryIcons: Record<RecordCategory, React.ReactNode> = {
   prescription: <Pill className="h-5 w-5" />,
@@ -45,7 +47,6 @@ const categoryIcons: Record<RecordCategory, React.ReactNode> = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user } = useUser();
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<MedicalRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,14 +56,12 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchRecords = async () => {
-      if (!user) return;
-
       try {
         setIsLoading(true);
         const recordsRef = collection(db, 'records');
         const q = query(
           recordsRef, 
-          where('userId', '==', user.id),
+          where('userId', '==', MOCK_USER_ID),
           orderBy('visitDate', 'desc')
         );
 
@@ -90,7 +89,7 @@ const Dashboard = () => {
     };
 
     fetchRecords();
-  }, [user]);
+  }, []);
 
   // Handle search and filtering
   useEffect(() => {

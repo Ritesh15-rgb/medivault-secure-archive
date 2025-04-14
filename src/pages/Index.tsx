@@ -4,14 +4,41 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Shield, Lock, FileCheck } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("signin");
-  
-  // Mock login functionality
-  const handleLogin = () => {
-    navigate('/dashboard');
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
+
+  // Mock login function
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    // Simulate login delay
+    setTimeout(() => {
+      setLoading(false);
+      // Mock successful login
+      localStorage.setItem('auth', JSON.stringify({ id: 'mock-user-id' }));
+      toast({
+        title: "Login successful",
+        description: "Welcome to MediVault!",
+      });
+      navigate('/dashboard');
+    }, 1000);
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const features = [
@@ -41,21 +68,12 @@ const Index = () => {
             <span className="text-2xl font-bold text-gray-900">MediVault</span>
           </div>
           <div className="space-x-2">
-            <Button 
-              variant="ghost"
-              onClick={() => setActiveTab("signin")}
-            >
-              Sign In
-            </Button>
-            <Button
-              onClick={() => setActiveTab("signup")}
-            >
-              Sign Up
-            </Button>
+            <Button variant="ghost" onClick={() => setActiveTab("signin")}>Sign In</Button>
+            <Button onClick={() => setActiveTab("signup")}>Sign Up</Button>
           </div>
         </div>
       </header>
-      
+
       <main className="flex-1 flex flex-col-reverse md:flex-row">
         <div className="bg-gray-50 w-full md:w-1/2 p-6 md:p-12 flex items-center">
           <div className="max-w-md mx-auto">
@@ -81,70 +99,65 @@ const Index = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="w-full md:w-1/2 p-6 md:p-12 flex items-center justify-center">
           <div className="w-full max-w-md">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <Tabs 
+              value={activeTab} 
+              onValueChange={setActiveTab}
+              className="w-full"
+            >
               <TabsList className="grid w-full grid-cols-2 mb-8">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
               <TabsContent value="signin" className="mt-0">
                 <div className="border rounded-lg p-4 bg-white shadow-sm">
-                  <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-4">
-                    <div>
-                      <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
-                      <input 
-                        type="email" 
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input 
                         id="email" 
-                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 border" 
-                        placeholder="you@example.com" 
+                        name="email" 
+                        type="email" 
+                        value={formData.email} 
+                        onChange={handleChange}
+                        placeholder="your@email.com" 
+                        required
                       />
                     </div>
-                    <div>
-                      <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
-                      <input 
-                        type="password" 
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input 
                         id="password" 
-                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 border" 
+                        name="password" 
+                        type="password" 
+                        value={formData.password} 
+                        onChange={handleChange}
                         placeholder="••••••••" 
+                        required
                       />
                     </div>
-                    <Button type="submit" className="w-full">Sign In</Button>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? "Signing In..." : "Sign In"}
+                    </Button>
                   </form>
                 </div>
               </TabsContent>
               <TabsContent value="signup" className="mt-0">
                 <div className="border rounded-lg p-4 bg-white shadow-sm">
-                  <form onSubmit={(e) => { e.preventDefault(); navigate('/onboarding'); }} className="space-y-4">
-                    <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700">Full Name</label>
-                      <input 
-                        type="text" 
-                        id="name" 
-                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 border" 
-                        placeholder="John Doe" 
-                      />
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-email">Email</Label>
+                      <Input id="signup-email" type="email" placeholder="your@email.com" required />
                     </div>
-                    <div>
-                      <label htmlFor="signup-email" className="block text-sm font-medium text-gray-700">Email</label>
-                      <input 
-                        type="email" 
-                        id="signup-email" 
-                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 border" 
-                        placeholder="you@example.com" 
-                      />
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-password">Password</Label>
+                      <Input id="signup-password" type="password" placeholder="••••••••" required />
                     </div>
-                    <div>
-                      <label htmlFor="signup-password" className="block text-sm font-medium text-gray-700">Password</label>
-                      <input 
-                        type="password" 
-                        id="signup-password" 
-                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 border" 
-                        placeholder="••••••••" 
-                      />
-                    </div>
-                    <Button type="submit" className="w-full">Sign Up</Button>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? "Signing Up..." : "Sign Up"}
+                    </Button>
                   </form>
                 </div>
               </TabsContent>
