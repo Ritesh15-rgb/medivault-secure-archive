@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -11,26 +11,16 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserCog, ShieldCheck, Bell, Upload } from 'lucide-react';
-
-// For testing without Clerk
-const mockUser = {
-  id: 'mock-user-id',
-  fullName: 'Mock User',
-  primaryEmailAddress: {
-    emailAddress: 'mock@example.com'
-  },
-  imageUrl: ''
-};
+import { AuthContext } from '@/App';
 
 const Profile = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  // Use mock user for now
-  const user = mockUser;
+  const { userId } = useContext(AuthContext);
   
   const [profileData, setProfileData] = useState({
-    fullName: user?.fullName || '',
-    email: user?.primaryEmailAddress?.emailAddress || '',
+    fullName: 'Mock User',
+    email: 'mock@example.com',
     phone: '',
     dateOfBirth: '',
     emergencyContactName: '',
@@ -51,13 +41,13 @@ const Profile = () => {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user) return;
+    if (!userId) return;
     
     setLoading(true);
     
     try {
       // Save profile data to Firestore
-      await setDoc(doc(db, 'users', user.id), {
+      await setDoc(doc(db, 'users', userId), {
         ...profileData,
         updatedAt: new Date().toISOString(),
       }, { merge: true });
@@ -78,12 +68,12 @@ const Profile = () => {
   };
 
   const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0] && user) {
+    if (e.target.files && e.target.files[0] && userId) {
       const file = e.target.files[0];
       
       try {
         // Create storage reference
-        const storageRef = ref(storage, `users/${user.id}/profile_image`);
+        const storageRef = ref(storage, `users/${userId}/profile_image`);
         
         // Upload file
         await uploadBytes(storageRef, file);
@@ -92,7 +82,7 @@ const Profile = () => {
         const downloadURL = await getDownloadURL(storageRef);
         
         // Update profile with new image URL
-        await setDoc(doc(db, 'users', user.id), {
+        await setDoc(doc(db, 'users', userId), {
           imageUrl: downloadURL,
           updatedAt: new Date().toISOString(),
         }, { merge: true });
@@ -124,9 +114,9 @@ const Profile = () => {
             <div className="flex flex-col items-center text-center">
               <div className="relative mb-4">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src={user?.imageUrl || ''} alt={user?.fullName || 'User'} />
+                  <AvatarImage src={''} alt={'User'} />
                   <AvatarFallback className="text-lg">
-                    {user?.fullName?.charAt(0) || 'U'}
+                    {'U'}
                   </AvatarFallback>
                 </Avatar>
                 <label htmlFor="profile-image" className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 cursor-pointer">
@@ -141,8 +131,8 @@ const Profile = () => {
                 </label>
               </div>
               
-              <h3 className="text-xl font-semibold">{user?.fullName}</h3>
-              <p className="text-gray-500 text-sm mt-1">{user?.primaryEmailAddress?.emailAddress}</p>
+              <h3 className="text-xl font-semibold">{'Mock User'}</h3>
+              <p className="text-gray-500 text-sm mt-1">{'mock@example.com'}</p>
             </div>
             
             <div className="mt-6 space-y-2">

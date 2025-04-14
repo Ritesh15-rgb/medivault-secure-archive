@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -29,9 +29,7 @@ import {
   DropdownMenuSeparator 
 } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
-
-// Mock user ID for now
-const MOCK_USER_ID = 'mock-user-id';
+import { AuthContext } from '@/App';
 
 // Category icons mapping
 const categoryIcons: Record<RecordCategory, React.ReactNode> = {
@@ -47,6 +45,7 @@ const categoryIcons: Record<RecordCategory, React.ReactNode> = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { userId } = useContext(AuthContext);
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<MedicalRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,7 +60,7 @@ const Dashboard = () => {
         const recordsRef = collection(db, 'records');
         const q = query(
           recordsRef, 
-          where('userId', '==', MOCK_USER_ID),
+          where('userId', '==', userId || 'mock-user-id'),
           orderBy('visitDate', 'desc')
         );
 
@@ -89,7 +88,7 @@ const Dashboard = () => {
     };
 
     fetchRecords();
-  }, []);
+  }, [userId]);
 
   // Handle search and filtering
   useEffect(() => {

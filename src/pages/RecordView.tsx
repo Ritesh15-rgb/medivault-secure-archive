@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { MedicalRecord } from '@/types';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { AuthContext } from '@/App';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,13 +30,11 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-// Mock user ID for now
-const MOCK_USER_ID = 'mock-user-id';
-
 const RecordView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { userId } = useContext(AuthContext);
   const [record, setRecord] = useState<MedicalRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -51,7 +50,7 @@ const RecordView = () => {
         const docRef = doc(db, 'records', id);
         const docSnap = await getDoc(docRef);
 
-        if (docSnap.exists() && docSnap.data().userId === MOCK_USER_ID) {
+        if (docSnap.exists() && docSnap.data().userId === (userId || 'mock-user-id')) {
           const data = docSnap.data();
           setRecord({
             ...data,
@@ -82,7 +81,7 @@ const RecordView = () => {
     };
 
     fetchRecord();
-  }, [id, navigate, toast]);
+  }, [id, navigate, toast, userId]);
 
   const handleDeleteRecord = async () => {
     if (!id) return;

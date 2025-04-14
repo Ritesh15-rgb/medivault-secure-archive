@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,10 +7,12 @@ import { Shield, Lock, FileCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { AuthContext } from '@/App';
 
 const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState("signin");
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -18,22 +20,29 @@ const Index = () => {
     password: '',
   });
 
-  // Mock login function
-  const handleSubmit = (e: React.FormEvent) => {
+  // Handle login/signup submission
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    // Simulate login delay
-    setTimeout(() => {
-      setLoading(false);
-      // Mock successful login
-      localStorage.setItem('auth', JSON.stringify({ id: 'mock-user-id' }));
+    try {
+      await login(formData.email, formData.password);
+      
       toast({
         title: "Login successful",
         description: "Welcome to MediVault!",
       });
+      
       navigate('/dashboard');
-    }, 1000);
+    } catch (error) {
+      toast({
+        title: "Login failed",
+        description: "Please check your credentials and try again",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
